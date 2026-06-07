@@ -1,0 +1,31 @@
+Audio Console 2.0.0
+
+This release marks the first version of Audio Console with full cross-browser support, introducing a Chrome/Edge build alongside the original Firefox addon.
+
+What's new
+
+Chrome and Edge support
+Audio Console now ships as two separate builds — one for Firefox (Manifest V2) and one for Chrome/Edge/Opera (Manifest V3). All features are identical across both builds. Install audio-console-firefox-*.zip in Firefox via about:addons → Install Add-on From File, and audio-console-chrome-*.zip in Chrome/Edge via the extensions page with Developer Mode enabled.
+
+Multi-browser build pipeline
+The project now has a proper build system (node build.mjs) that compiles both targets from a single shared source. Version numbers are automatically propagated from package.json into both built manifests at build time.
+
+MV3 compatibility (Chrome/Edge)
+The Chrome build uses a service worker background, the Side Panel API, and a world: "MAIN" content script (injector.js) that patches createElement to set crossOrigin='anonymous' on audio and video elements before page scripts run — working cleanly within Chrome's strict Content Security Policy even on sites like YouTube. The webextension-polyfill provides a unified browser.* API surface across both targets.
+
+Resilient sidebar port connection
+The Chrome sidebar now handles service worker lifecycle events correctly. If the MV3 service worker is killed by the browser (which happens after ~30 seconds of inactivity), the sidebar automatically reconnects within one second without losing state or requiring a reload.
+
+---
+
+Installation
+
+Firefox: about:addons → gear icon → Install Add-on From File → select audio-console-firefox-v2.0.0.zip
+
+Chrome / Edge / Opera: Go to chrome://extensions (or edge://extensions) → enable Developer mode → Install from file if available, or unzip first and use Load unpacked pointing at the unzipped folder.
+
+---
+
+Full feature list
+
+See the README for the complete feature documentation — channel strips, 13-effect chain, parametric EQ, real-time metering, spectrum analysis, per-URL presets, drag-to-reorder, and more.

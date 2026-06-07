@@ -2,10 +2,11 @@ const tabData   = new Map();
 const groupData = new Map(); // groupId → { name, color }
 let sidebarPort = null;
 
-// Chrome MV3: make the toolbar button toggle the side panel
+// @chrome-only
 if (typeof chrome !== 'undefined' && chrome.sidePanel) {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 }
+// @end-chrome-only
 
 function broadcastTabList() {
   if (!sidebarPort) return;
@@ -112,8 +113,7 @@ browser.runtime.onConnect.addListener(port => {
 
 browser.runtime.onMessage.addListener((msg, sender) => {
   // Chrome/Opera: content script requests a tab capture stream ID.
-  // getMediaStreamId must be called from the background; the ID is passed back
-  // so the content script can call getUserMedia with chromeMediaSourceId.
+  // @chrome-only
   if (msg.type === 'GET_TAB_STREAM_ID') {
     const tabId = sender.tab?.id;
     if (!tabId || typeof chrome === 'undefined' || !chrome.tabCapture) return false;
@@ -123,6 +123,7 @@ browser.runtime.onMessage.addListener((msg, sender) => {
       });
     });
   }
+  // @end-chrome-only
 
   const tabId = sender.tab?.id;
   if (!tabId) return;

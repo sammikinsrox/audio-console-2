@@ -1,12 +1,12 @@
 <img width="1200" height="250" alt="logolarge" src="https://github.com/user-attachments/assets/1f97c06c-a32c-492a-8b5d-d5081d812ff0" />
 
-A professional per-tab audio mixing console for Firefox. Opens as a sidebar and provides a full channel strip for every tab playing audio, with a complete effects chain, parametric EQ, real-time metering, and spectrum analysis.
+A professional per-tab audio mixing console for Firefox, Chrome, and Edge. Opens as a sidebar and provides a full channel strip for every tab playing audio, with a complete effects chain, parametric EQ, real-time metering, and spectrum analysis.
 
 ## Features
 
 ### Channel strips
 
-Every browser tab that is playing audio gets its own channel strip in the sidebar. Each strip is a self-contained mixing console with metering, gain, pan, stereo width, mute, solo, EQ, and a full effects chain. Strips can be freely reordered by dragging, renamed, and collapsed to a minimal view. Tab groups from Firefox's built-in tab grouping feature are visually identified with a color-coded bar at the bottom of each strip.
+Every browser tab that is playing audio gets its own channel strip in the sidebar. Each strip is a self-contained mixing console with metering, gain, pan, stereo width, mute, solo, EQ, and a full effects chain. Strips can be freely reordered by dragging, renamed, and collapsed to a minimal view. Tab groups are visually identified with a color-coded bar at the bottom of each strip (Firefox and Chrome).
 
 **Fader**
 
@@ -46,7 +46,7 @@ A number badge on each strip shows its current position in the rack. Numbers upd
 
 **Tab groups**
 
-If Firefox tab groups are in use, a color bar at the bottom of the channel strip indicates which group the tab belongs to. Hovering the bar shows the group name as a tooltip.
+If browser tab groups are in use, a color bar at the bottom of the channel strip indicates which group the tab belongs to. Hovering the bar shows the group name as a tooltip. Supported in Firefox and Chrome.
 
 ---
 
@@ -156,16 +156,32 @@ The Solar theme is a fully light variant that adjusts backgrounds, text, borders
 
 ## Installation
 
-> Firefox 142 or later is required.
+Download the latest release from the [Releases page](../../releases).
 
-Install from [Firefox Add-ons (AMO)](https://addons.mozilla.org) (link coming soon), or load it manually for development:
+### Firefox
 
-1. Clone or download this repository
-2. Open Firefox and navigate to `about:debugging`
-3. Click **This Firefox**, then **Load Temporary Add-on**
-4. Select the `manifest.json` file in the repository root
+> Firefox 109 or later is required.
+
+Install from [Firefox Add-ons (AMO)](https://addons.mozilla.org) (link coming soon), or load the zip manually:
+
+1. Open Firefox and navigate to `about:addons`
+2. Click the gear icon and choose **Install Add-on From File**
+3. Select `audio-console-firefox-*.zip`
+
+Or for temporary development loading: navigate to `about:debugging` → **This Firefox** → **Load Temporary Add-on** → select any file inside the unzipped folder.
 
 Open the sidebar via the Audio Console toolbar button, or through **View > Sidebar > Audio Console**.
+
+### Chrome / Edge / Opera
+
+> Chrome 116 or later is required (Side Panel API).
+
+1. Download `audio-console-chrome-*.zip` and unzip it to a folder
+2. Open `chrome://extensions` (or `edge://extensions`)
+3. Enable **Developer mode** in the top right
+4. Click **Load unpacked** and select the unzipped folder
+
+Click the Audio Console icon in the toolbar to open the side panel.
 
 ---
 
@@ -183,7 +199,9 @@ The background script manages the list of active tabs with audio, routes message
 
 ## Tech stack
 
-Vanilla JavaScript with no build step and no runtime dependencies. CSS custom properties for theming. Web Audio API with AudioWorklet for sample-accurate DSP. Firefox WebExtension APIs (`browser.*`). Fonts loaded from Google Fonts (Bebas Neue, Barlow Condensed, JetBrains Mono).
+Vanilla JavaScript with a lightweight build step (`node build.mjs`) and no runtime dependencies. CSS custom properties for theming. Web Audio API with AudioWorklet for sample-accurate DSP. WebExtension APIs via `webextension-polyfill` (`browser.*` namespace unified across Firefox and Chrome). Fonts loaded from Google Fonts (Bebas Neue, Barlow Condensed, JetBrains Mono).
+
+The Firefox build uses Manifest V2 with a sidebar action and background scripts. The Chrome/Edge build uses Manifest V3 with a service worker, the Side Panel API, and a `world: "MAIN"` content script to patch `createElement` before page scripts run — bypassing strict Content Security Policies on sites like YouTube without requiring `unsafe-inline`.
 
 ---
 

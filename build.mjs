@@ -35,7 +35,8 @@ async function buildBrowser(browser) {
   manifest.version = version;
   await writeFile(join(out, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
-  // Background — Chrome service worker needs the polyfill via importScripts
+  // Background — Chrome service worker needs the polyfill via importScripts;
+  // Firefox build strips @chrome-only blocks to avoid AMO static analysis warnings.
   let bg = await readFile(join(src, 'background.js'), 'utf8');
   if (browser === 'chrome') {
     bg = `importScripts('browser-polyfill.js');\n` + bg;
@@ -43,6 +44,8 @@ async function buildBrowser(browser) {
       join(__dirname, 'node_modules', 'webextension-polyfill', 'dist', 'browser-polyfill.js'),
       join(out, 'browser-polyfill.js')
     );
+  } else {
+    bg = bg.replace(/[ \t]*\/\/ @chrome-only\r?\n[\s\S]*?\/\/ @end-chrome-only\r?\n?/g, '');
   }
   await writeFile(join(out, 'background.js'), bg);
 
