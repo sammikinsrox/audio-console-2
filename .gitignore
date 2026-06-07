@@ -1,0 +1,12 @@
+*.zip
+dist/
+node_modules/
+
+# Krita backup files
+*.kra~
+*.kra.autosave
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini

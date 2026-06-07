@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm ci
+
+      - run: node build.mjs all
+
+      - name: Package Firefox
+        run: cd dist/firefox && zip -r ../../audio-console-firefox-${{ github.ref_name }}.zip .
+
+      - name: Package Chrome
+        run: cd dist/chrome && zip -r ../../audio-console-chrome-${{ github.ref_name }}.zip .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            audio-console-firefox-${{ github.ref_name }}.zip
+            audio-console-chrome-${{ github.ref_name }}.zip
+          generate_release_notes: true

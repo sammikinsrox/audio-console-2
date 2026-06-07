@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "description": "Professional per-tab audio mixing console for Chrome and Opera",
+  "permissions": ["tabs", "tabGroups", "storage", "tabCapture", "sidePanel"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["injector.js"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": false
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["browser-polyfill.js", "content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidebar/sidebar.html"
+  },
+  "action": {
+    "default_title": "Audio Console",
+    "default_icon": {
+      "48": "icons/icon.svg"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["worklets/*.js", "browser-polyfill.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

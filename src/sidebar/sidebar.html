@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Audio Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@300;400;600&family=JetBrains+Mono:wght@400;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="sidebar.css">
+</head>
+
+<body>
+  <div id="console">
+
+    <header id="topbar">
+      <img id="logo" src="../logo/logo.png" alt="Audio Console">
+      <div id="topbar-right">
+        <span id="ctx-status" class="status-dot" title="Audio context status"></span>
+        <button id="btn-activate" title="Audio context suspended — click to unlock" style="display:none">UNLOCK AUDIO</button>
+        <div id="zoom-controls">
+          <button id="btn-zoom-out" title="Zoom out">−</button>
+          <span id="zoom-level">100%</span>
+          <button id="btn-zoom-in" title="Zoom in">+</button>
+        </div>
+        <button id="btn-theme" title="Theme settings">THEME</button>
+      </div>
+    </header>
+
+    <div id="mixer-wrapper">
+      <div id="channel-rack" role="list"></div>
+
+      <!-- Master strip -->
+      <div id="master-strip" class="channel-strip master">
+        <div class="ch-header">
+          <span class="ch-name">MASTER</span>
+        </div>
+        <canvas class="ch-spectrum-canvas" width="136" height="52" style="display:none"></canvas>
+        <div class="pan-row">
+          <div class="pan-header">
+            <span class="pan-label">PAN</span>
+            <button class="btn-reset-pan" title="Reset pan">↺</button>
+          </div>
+          <canvas class="pan-knob" width="58" height="58"></canvas>
+        </div>
+        <div class="fader-row">
+          <div class="meter-col">
+            <div class="clip-led" title="CLIP — click to reset"></div>
+            <canvas class="meter-canvas" width="36" height="220"></canvas>
+          </div>
+          <div class="fader-ticks">
+            <span class="tick-major" style="bottom:calc(100% - 32px)"></span>
+            <span class="tick-minor" style="bottom:calc(95% - 28.8px)"></span>
+            <span class="tick-major" style="bottom:calc(90% - 25.6px)"></span>
+            <span class="tick-minor" style="bottom:calc(85% - 22.4px)"></span>
+            <span class="tick-unity" style="bottom:calc(80% - 19.2px)"></span>
+            <span class="tick-minor" style="bottom:calc(67.3% - 11.07px)"></span>
+            <span class="tick-major" style="bottom:calc(56.63% - 4.24px)"></span>
+            <span class="tick-minor" style="bottom:calc(47.7% + 1.47px)"></span>
+            <span class="tick-major" style="bottom:calc(40.1% + 6.34px)"></span>
+            <span class="tick-minor" style="bottom:calc(31.8% + 11.65px)"></span>
+            <span class="tick-major" style="bottom:calc(25.3% + 15.81px)"></span>
+            <span class="tick-minor" style="bottom:calc(14.2% + 22.91px)"></span>
+            <span class="tick-major" style="bottom:calc(8% + 26.88px)"></span>
+            <span class="tick-major" style="bottom:32px"></span>
+          </div>
+          <div class="fader-wrap">
+            <input type="range" class="fader" orient="vertical" min="0" max="1.25" step="0.001" value="1">
+          </div>
+          <div class="fader-scale">
+            <span style="bottom:calc(100% - 32px)">+12</span>
+            <span style="bottom:calc(90% - 25.6px)">+6</span>
+            <span style="bottom:calc(80% - 19.2px)" class="pip-unity">0</span>
+            <span style="bottom:calc(56.63% - 4.24px)">-3</span>
+            <span style="bottom:calc(40.10% + 6.34px)">-6</span>
+            <span style="bottom:calc(25.30% + 15.81px)">-10</span>
+            <span style="bottom:calc(8% + 26.88px)">-20</span>
+            <span style="bottom:32px">-∞</span>
+          </div>
+        </div>
+        <div class="fader-reset-row">
+          <button class="btn-reset-fader">↺ 0dB</button>
+        </div>
+        <div class="corr-row" title="Stereo correlation — measures phase relationship between L and R channels. +1: mono-compatible, 0: uncorrelated, −1: out of phase (cancels in mono)">
+          <span class="corr-label">CORR</span>
+          <canvas class="corr-meter" width="90" height="10"></canvas>
+        </div>
+        <div class="ch-buttons">
+          <button class="btn-mute">M</button>
+        </div>
+        <div class="ch-num">M</div>
+      </div>
+    </div>
+
+    <div id="analyzer-bar">
+      <canvas id="spectrum-canvas"></canvas>
+    </div>
+
+  </div>
+
+  <!-- Floating effect editor -->
+  <div id="effect-editor" class="hidden">
+    <div id="effect-editor-header">
+      <span id="effect-editor-title">GATE</span>
+      <label class="bypass-toggle">
+        <input type="checkbox" id="effect-bypass" checked>
+        <span class="bypass-track"><span class="bypass-thumb"></span></span>
+        <span class="bypass-label">ON</span>
+      </label>
+      <button id="effect-editor-close">×</button>
+    </div>
+    <div id="preset-row">
+      <label>PRESET</label>
+      <select id="preset-select">
+        <option value="">— Preset —</option>
+      </select>
+      <button id="btn-reset-all" class="btn-reset-all">RESET ALL</button>
+    </div>
+    <canvas id="effect-viz-canvas" style="display:none;border-bottom:1px solid #30304a"></canvas>
+    <div id="effect-editor-params"></div>
+  </div>
+
+  <!-- Parametric EQ Editor -->
+  <div id="eq-editor" class="hidden">
+    <div id="eq-header">
+      <span id="eq-title">PARAMETRIC EQ</span>
+      <span id="eq-chan-label">CH 1</span>
+      <label class="bypass-toggle">
+        <input type="checkbox" id="eq-bypass" checked>
+        <span class="bypass-track"><span class="bypass-thumb"></span></span>
+        <span class="bypass-label">ON</span>
+      </label>
+      <button id="eq-close">×</button>
+    </div>
+    <div id="eq-display">
+      <canvas id="eq-canvas" width="620" height="220"></canvas>
+    </div>
+    <div id="eq-band-strip"></div>
+  </div>
+
+  <!-- Theme panel -->
+  <div id="theme-panel" class="hidden">
+    <div id="theme-panel-header">
+      <span id="theme-panel-title">THEME</span>
+      <button id="btn-theme-close">×</button>
+    </div>
+    <div id="theme-swatches"></div>
+    <div id="accent-row">
+      <span class="accent-label">ACCENT</span>
+      <div id="accent-picker-wrap">
+        <input type="color" id="accent-picker" value="#d4870a">
+        <span id="accent-hex">#d4870a</span>
+      </div>
+      <button id="btn-reset-accent">↺</button>
+    </div>
+  </div>
+
+  <div id="param-set-menu" class="hidden">
+    <span class="param-set-name">LEVEL</span>
+    <input type="number" id="param-set-val" step="0.1" placeholder="0.0">
+    <span class="param-set-unit">dB</span>
+    <button id="param-set-ok">OK</button>
+    <button id="param-set-cancel">✕</button>
+  </div>
+
+  <script src="sidebar.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,6 @@
+{
+    "name":  "Audio Console",
+    "icons":  {
+                  "48":  "icons/icon.svg"
+              }
+}
