@@ -10,7 +10,9 @@ class ChorusProcessor extends AudioWorkletProcessor {
 
   constructor() {
     super();
-    const sz = Math.ceil(sampleRate * 0.06);
+    // Max read offset is base + depth = 3*depth + 1 samples; depth max is 20 ms,
+    // so the buffer must cover > 60 ms or reads wrap past the write head (NaN).
+    const sz = Math.ceil(sampleRate * 0.065);
     this.buf = [new Float32Array(sz), new Float32Array(sz)];
     this.wr = 0;
     this.ph = 0;
@@ -31,7 +33,7 @@ class ChorusProcessor extends AudioWorkletProcessor {
 
     for (let i = 0; i < 128; i++) {
       this.ph = (this.ph + dPh) % (2 * Math.PI);
-      const delay = base + Math.sin(this.ph) * depth;
+      const delay = Math.min(sz - 1, base + Math.sin(this.ph) * depth);
       const ri = (this.wr - Math.floor(delay) + sz) % sz;
 
       for (let ch = 0; ch < Math.min(out.length, 2); ch++) {

@@ -22,26 +22,36 @@ class GateProcessor extends AudioWorkletProcessor {
     if (!inp?.length) return true;
 
     const enabled   = parameters.enabled[0];
+
+    if (!enabled) {
+      for (let ch = 0; ch < out.length; ch++) out[ch].set(inp[ch] ?? inp[0]);
+      return true;
+    }
+
     const threshold = Math.pow(10, parameters.threshold[0] / 20);
     const atkCoef   = Math.exp(-1 / (sampleRate * parameters.attack[0]));
     const relCoef   = Math.exp(-1 / (sampleRate * parameters.release[0]));
     const holdMax   = Math.floor(sampleRate * parameters.hold[0]);
+    const blockSize = inp[0].length;
 
-    for (let ch = 0; ch < out.length; ch++) {
-      const ic = inp[ch] ?? inp[0];
-      const oc = out[ch];
-      for (let i = 0; i < oc.length; i++) {
-        if (!enabled) { oc[i] = ic[i]; continue; }
-        const level = Math.abs(ic[i]);
-        if (level >= threshold) {
-          this.holdLeft = holdMax;
-          this.gain = this.gain * atkCoef + (1 - atkCoef);
-        } else if (this.holdLeft > 0) {
-          this.holdLeft--;
-        } else {
-          this.gain = this.gain * relCoef;
-        }
-        oc[i] = ic[i] * this.gain;
+    for (let i = 0; i < blockSize; i++) {
+      // Stereo-linked detection: one gain trajectory shared by all channels
+      let level = 0;
+      for (let ch = 0; ch < inp.length; ch++) {
+        const a = Math.abs(inp[ch][i]);
+        if (a > level) level = a;
+      }
+      if (level >= threshold) {
+        this.holdLeft = holdMax;
+        this.gain = this.gain * atkCoef + (1 - atkCoef);
+      } else if (this.holdLeft > 0) {
+        this.holdLeft--;
+      } else {
+        this.gain = this.gain * relCoef;
+      }
+      for (let ch = 0; ch < out.length; ch++) {
+        const ic = inp[ch] ?? inp[0];
+        out[ch][i] = ic[i] * this.gain;
       }
     }
     if (++this._tick >= 20) {

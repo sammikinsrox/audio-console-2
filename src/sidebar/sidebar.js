@@ -918,9 +918,12 @@ class AudioConsole {
     this.customNames     = {};        // normalizedUrl → custom label string
     this.collapsedUrls   = new Set(); // normalizedUrl → collapsed preference
     this._presetTimers   = new Map(); // tabId → debounce timer
+    this._irTimers       = new Map(); // tabId → reverb IR regen debounce timer
     this.paramsFetched   = new Set(); // tabIds that have received PARAMS_RESPONSE
     this.clippedChannels = new Set(); // tabIds that have hit 0 dBFS
     this.masterClipped   = false;
+    this._dirtyData      = new Set(); // tabIds with fresh analyser data since last frame
+    this._masterDirty    = true;      // master meter/spectrum/correlation need redraw
   }
 
   init() {
@@ -965,6 +968,10 @@ class AudioConsole {
       }
       if (r.urlPresets) {
         this.urlPresets = r.urlPresets;
+        // Migrate presets saved by older versions that captured session state.
+        for (const p of Object.values(this.urlPresets)) {
+          delete p.masterFader; delete p.soloMute; delete p.solo;
+        }
         // If _restoreChannelParams already ran (PARAMS_RESPONSE arrived before storage
         // resolved), urlPresets was empty at that point so no preset was applied.
         // Re-apply now for any channel whose URL has a stored preset.
@@ -1033,6 +1040,7 @@ class AudioConsole {
     });
     el.addEventListener('click', () => {
       this.selectedTab = null;
+      this._masterDirty = true; // master spectrum/correlation source changed
       document.querySelectorAll('.channel-strip').forEach(s => s.classList.remove('selected'));
       el.classList.add('selected');
       this._updateUnlockButton(null);
@@ -1052,7 +1060,7 @@ class AudioConsole {
     if (masterMeter) {
       const ro = new ResizeObserver(() => {
         const h = Math.round(masterMeter.clientHeight);
-        if (h > 0 && masterMeter.height !== h) masterMeter.height = h;
+        if (h > 0 && masterMeter.height !== h) { masterMeter.height = h; this._masterDirty = true; }
       });
       ro.observe(masterMeter);
     }
@@ -1068,8 +1076,21 @@ class AudioConsole {
         limiterGr: msg.limiterGr ?? 0 });
       this._updatePeakHold(msg.tabId, msg.peak);
       this._updateTruePeakHold(msg.tabId, msg.truePeak ?? msg.peak);
+      this._dirtyData.add(msg.tabId);
+      this._masterDirty = true;
+      // Clip LED — latch here (not in the draw) so clips on collapsed strips
+      // still register; cleared only by user click.
+      if (msg.peak >= 1.0) {
+        this.clippedChannels.add(msg.tabId);
+        this.channels.get(msg.tabId)?.el.querySelector('.clip-led')?.classList.add('clipped');
+      }
       if (msg.tabId === this.selectedTab) this._updateUnlockButton(msg.ctxState);
     }
+  }
+
+  _markAllDirty() {
+    for (const tabId of this.channels.keys()) this._dirtyData.add(tabId);
+    this._masterDirty = true;
   }
 
   _reconcileTabs(tabs, groups = {}) {
@@ -1138,7 +1159,7 @@ class AudioConsole {
         this._presetTimers.delete(tabId);
         const closeUrl = this._normalizeUrl(ch.info.url);
         if (closeUrl) {
-          this.urlPresets[closeUrl] = JSON.parse(JSON.stringify(ch.params));
+          this.urlPresets[closeUrl] = this._presetSnapshot(ch.params);
           browser.storage.local.set({ urlPresets: this.urlPresets });
         }
 
@@ -1170,6 +1191,10 @@ class AudioConsole {
       const ch = this.channels.get(tabId);
       if (ch) ch.el.querySelector('.ch-num').textContent = n++;
     }
+
+    // New channels must inherit any active solo/master-mute silencing.
+    if (this.masterMuted || this.soloedTabs.size) this._applyMuteStates();
+    this._markAllDirty();
   }
 
   _saveChannelOrder() {
@@ -1187,6 +1212,16 @@ class AudioConsole {
   }
 
   // ── URL presets ───────────────────────────────────────────────────────────
+  // Strip session-only state before persisting: masterFader is global, and
+  // solo/soloMute describe the current mix session, not the URL's settings.
+  _presetSnapshot(params) {
+    const snap = JSON.parse(JSON.stringify(params));
+    delete snap.masterFader;
+    delete snap.soloMute;
+    delete snap.solo;
+    return snap;
+  }
+
   _schedulePresetSave(tabId) {
     clearTimeout(this._presetTimers.get(tabId));
     this._presetTimers.set(tabId, setTimeout(() => this._saveUrlPreset(tabId), 1200));
@@ -1197,7 +1232,7 @@ class AudioConsole {
     if (!ch) return;
     const url = this._normalizeUrl(ch.info.url);
     if (!url) return;
-    this.urlPresets[url] = JSON.parse(JSON.stringify(ch.params));
+    this.urlPresets[url] = this._presetSnapshot(ch.params);
     browser.storage.local.set({ urlPresets: this.urlPresets });
     const dot = ch.el.querySelector('.ch-preset-dot');
     if (dot) dot.classList.add('has-preset');
@@ -1249,6 +1284,7 @@ class AudioConsole {
     const collapsed = ch.el.classList.toggle('collapsed');
     const btn = ch.el.querySelector('.btn-collapse');
     if (btn) btn.textContent = collapsed ? '›' : '‹';
+    if (!collapsed) this._dirtyData.add(tabId); // repaint canvases skipped while hidden
     const url = this._normalizeUrl(ch.info.url);
     if (url) {
       if (collapsed) this.collapsedUrls.add(url);
@@ -1351,6 +1387,10 @@ class AudioConsole {
     } else {
       this._sendParam(tabId, 'masterFader', this.masterFader);
     }
+    // Don't keep session-only fields in ch.params — they'd leak into the
+    // SET_PARAMS sent on preset apply and into future preset saves.
+    delete ch.params.masterFader;
+    delete ch.params.soloMute;
 
     // Sync all strip UI from ch.params (preset already merged in above).
     this._syncChannelUi(tabId);
@@ -1642,6 +1682,7 @@ class AudioConsole {
 
     el.addEventListener('click', () => {
       this.selectedTab = tabId;
+      this._masterDirty = true; // master spectrum/correlation source changed
       document.querySelectorAll('.channel-strip').forEach(s => s.classList.remove('selected'));
       el.classList.add('selected');
       const data = this.analyserData.get(tabId);
@@ -1745,7 +1786,7 @@ class AudioConsole {
     // Sync meter canvas buffer height to CSS-rendered height
     const meterRO = new ResizeObserver(() => {
       const h = Math.round(meterCanvas.clientHeight);
-      if (h > 0 && meterCanvas.height !== h) meterCanvas.height = h;
+      if (h > 0 && meterCanvas.height !== h) { meterCanvas.height = h; this._dirtyData.add(tabId); }
     });
     meterRO.observe(meterCanvas);
 
@@ -1950,26 +1991,34 @@ class AudioConsole {
   _sendEffectParam(tabId, effectKey, paramKey, value) {
     this._sendParam(tabId, `${effectKey}.${paramKey}`, value);
     if (effectKey === 'reverb' && (paramKey === 'size' || paramKey === 'decay')) {
-      const ch = this.channels.get(tabId);
-      if (ch) {
-        const { size, decay } = ch.params.reverb;
-        this._post({ type: 'UPDATE_REVERB_IR', tabId, size, decay });
-      }
+      // Debounce: regenerating the IR allocates/fills up to 10s of stereo audio,
+      // so do it once after the slider settles instead of on every input tick.
+      clearTimeout(this._irTimers.get(tabId));
+      this._irTimers.set(tabId, setTimeout(() => {
+        this._irTimers.delete(tabId);
+        const ch = this.channels.get(tabId);
+        if (ch) {
+          const { size, decay } = ch.params.reverb;
+          this._post({ type: 'UPDATE_REVERB_IR', tabId, size, decay });
+        }
+      }, 150));
     }
   }
 
-  _applySolo() {
+  // Session-level silencing (solo elsewhere / master mute) goes through the
+  // separate soloMute param so it never overwrites a channel's own mute state
+  // or leaks into URL presets.
+  _applyMuteStates() {
     const anySolo = this.soloedTabs.size > 0;
-    for (const [tabId, ch] of this.channels) {
-      const eff = ch.params.mute || (anySolo && !this.soloedTabs.has(tabId));
-      this._sendParam(tabId, 'mute', eff);
+    for (const tabId of this.channels.keys()) {
+      const eff = this.masterMuted || (anySolo && !this.soloedTabs.has(tabId));
+      this._post({ type: 'SET_PARAM', tabId, path: 'soloMute', value: eff });
     }
   }
 
-  _applyMasterMute() {
-    for (const [tabId, ch] of this.channels)
-      this._sendParam(tabId, 'mute', this.masterMuted || ch.params.mute);
-  }
+  _applySolo()      { this._applyMuteStates(); }
+
+  _applyMasterMute() { this._applyMuteStates(); }
 
   _updateUnlockButton(ctxState) {
     const btn = document.getElementById('btn-activate');
@@ -2370,6 +2419,8 @@ class AudioConsole {
   _isLightTheme() { return this._currentThemeKey === 'solar'; }
 
   _startRaf() {
+    // Analyser data arrives at 20 Hz; everything except the animated effect viz
+    // is gated on dirty flags so canvases redraw only when their data changed.
     const tick = () => {
       this._drawMeters();
       this._updateLufsDisplays();
@@ -2379,6 +2430,8 @@ class AudioConsole {
       this._updateGrBars();
       this._updateCorrelationMeter();
       this._updateEqSpectrum();
+      this._dirtyData.clear();
+      this._masterDirty = false;
       this.raf = requestAnimationFrame(tick);
     };
     this.raf = requestAnimationFrame(tick);
@@ -2387,12 +2440,17 @@ class AudioConsole {
   _updateEqSpectrum() {
     if (!this.eqEditor || this.eqTabId == null) return;
     const fft = this.analyserData.get(this.eqTabId)?.fft ?? null;
+    // Each ANALYSER_DATA message carries a new fft array, so a reference compare
+    // detects fresh data. Interaction (drag/scroll) calls eqEditor.draw() itself.
+    if (fft === this._lastEqFft) return;
+    this._lastEqFft = fft;
     this.eqEditor.setSpectrum(fft);
     this.eqEditor.draw();
   }
 
   _updateLufsDisplays() {
     for (const [tabId, ch] of this.channels) {
+      if (!this._dirtyData.has(tabId)) continue;
       const el = ch.el.querySelector('.lufs-val');
       if (!el) continue;
       const lufs = this.analyserData.get(tabId)?.lufs;
@@ -2408,6 +2466,7 @@ class AudioConsole {
 
   _updateGrBars() {
     for (const [tabId, ch] of this.channels) {
+      if (!this._dirtyData.has(tabId)) continue;
       const data = this.analyserData.get(tabId);
       if (!data) continue;
       const p = ch.params;
@@ -2428,6 +2487,7 @@ class AudioConsole {
   }
 
   _updateCorrelationMeter() {
+    if (!this._masterDirty) return;
     const masterEl = document.getElementById('master-strip');
     const canvas = masterEl?.querySelector('.corr-meter');
     if (!canvas) return;
@@ -2480,6 +2540,8 @@ class AudioConsole {
     const DB_SCALE = [[0, '0'], [-6, '-6'], [-12, '-12'], [-20, '-20'], [-40, '-40']];
 
     for (const [tabId, ch] of this.channels) {
+      if (!this._dirtyData.has(tabId)) continue;
+      if (ch.el.classList.contains('collapsed')) continue; // canvas hidden
       const canvas = ch.el.querySelector('.meter-canvas');
       if (!canvas) continue;
       const g = canvas.getContext('2d');
@@ -2528,6 +2590,15 @@ class AudioConsole {
         g.fillText(holdText, BAR_W + 2, labelY);
       }
 
+      // True-peak hold — thinner line tracking inter-sample peaks
+      const tpHold = this.truePeakHolds.get(tabId);
+      if (tpHold?.level > 0) {
+        const tpDb = 20 * Math.log10(tpHold.level);
+        const tpY = H - Math.max(0, Math.min(H, ((tpDb + 60) / 66) * H));
+        g.fillStyle = tpDb >= 0 ? 'rgba(255,51,85,0.7)' : 'rgba(200,200,232,0.45)';
+        g.fillRect(1, tpY, Math.max(1, Math.floor(BAR_W / 2)), 1);
+      }
+
       // Segment dividers on bar only
       g.fillStyle = light ? '#ddd7cf' : '#08080d';
       for (let i = 1; i < 12; i++) g.fillRect(0, Math.round(H * i / 12), BAR_W, 1);
@@ -2546,18 +2617,12 @@ class AudioConsole {
         g.fillText(text, BAR_W + 4, y + 4);
       }
 
-      // Clip LED — latch on 0 dBFS, clear only by user click
-      if (peak >= 1.0) {
-        this.clippedChannels.add(tabId);
-        const led = ch.el.querySelector('.clip-led');
-        if (led) led.classList.add('clipped');
-      }
     }
 
     // Master meter — max peak across all channels (master fader already baked in)
     const masterEl = document.getElementById('master-strip');
     const masterCanvas = masterEl?.querySelector('.meter-canvas');
-    if (masterCanvas) {
+    if (masterCanvas && this._masterDirty) {
       const g = masterCanvas.getContext('2d');
       const W = masterCanvas.width, H = masterCanvas.height;
 
@@ -2610,6 +2675,15 @@ class AudioConsole {
         g.fillText(holdText, BAR_W + 2, labelY);
       }
 
+      // True-peak hold — thinner line tracking inter-sample peaks
+      const tpHold = this.truePeakHolds.get('master');
+      if (tpHold?.level > 0) {
+        const tpDb = 20 * Math.log10(tpHold.level);
+        const tpY = H - Math.max(0, Math.min(H, ((tpDb + 60) / 66) * H));
+        g.fillStyle = tpDb >= 0 ? 'rgba(255,51,85,0.7)' : 'rgba(200,200,232,0.45)';
+        g.fillRect(1, tpY, Math.max(1, Math.floor(BAR_W / 2)), 1);
+      }
+
       g.fillStyle = light ? '#ddd7cf' : '#08080d';
       for (let i = 1; i < 12; i++) g.fillRect(0, Math.round(H * i / 12), BAR_W, 1);
 
@@ -2634,6 +2708,8 @@ class AudioConsole {
 
   _drawChannelSpectrums() {
     for (const [tabId, ch] of this.channels) {
+      if (!this._dirtyData.has(tabId)) continue;
+      if (ch.el.classList.contains('collapsed')) continue; // canvas hidden
       const canvas = ch.el.querySelector('.ch-spectrum-canvas');
       if (!canvas) continue;
 
@@ -2691,9 +2767,11 @@ class AudioConsole {
     const rect = canvas.parentElement.getBoundingClientRect();
     canvas.width  = Math.round(rect.width);
     canvas.height = Math.round(rect.height);
+    this._masterDirty = true;
   }
 
   _drawMasterSpectrum() {
+    if (!this._masterDirty) return;
     const canvas = this.specCanvas;
     if (!canvas) return;
     const g = canvas.getContext('2d');
@@ -2812,7 +2890,8 @@ class AudioConsole {
     if (!ch) return;
     this.eqTabId = tabId;
 
-    const n = [...this.channels.keys()].indexOf(tabId) + 1;
+    const orderIdx = this.channelOrder.indexOf(tabId);
+    const n = (orderIdx !== -1 ? orderIdx : [...this.channels.keys()].indexOf(tabId)) + 1;
     document.getElementById('eq-chan-label').textContent = `CH ${n}`;
     document.getElementById('eq-bypass').checked = ch.params.eq.enabled;
 
@@ -3373,6 +3452,7 @@ class AudioConsole {
     const mode = ep.mode;
 
     const overdrive = x => {
+      x *= 1 + Math.min(k, 9); // matches worklet: amount = input drive, max 10x
       const abs = Math.abs(x), s = x < 0 ? -1 : 1;
       if (abs < 1/3) return s * 2 * abs;
       if (abs < 2/3) return s * (3 - (2 - 3 * abs) ** 2) / 3;
@@ -3952,6 +4032,7 @@ class AudioConsole {
 
     this._redrawKnobs();
     this._redrawStereoVizzes();
+    this._markAllDirty();
     if (this.eqEditor) this.eqEditor.draw();
     if (savePrefs) this._saveThemePrefs();
   }
@@ -3972,6 +4053,7 @@ class AudioConsole {
     _setAccentGlobals(hex, dim);
     this._injectFaderStyle(hex, hi, dim);
     this._redrawKnobs();
+    this._markAllDirty();
     if (savePrefs) this._saveThemePrefs();
   }
 

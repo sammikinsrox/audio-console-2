@@ -334,7 +334,10 @@ function applyAll() {
     panner, fader, limiter } = chain;
 
   const faderGain = v => v <= 1.0 ? v : Math.pow(10, (v - 1.0) * 2.4);
-  fader.gain.value   = params.mute ? 0 : faderGain(params.fader) * faderGain(params.masterFader ?? 1.0);
+  // soloMute is session-level silencing (solo on another channel / master mute),
+  // kept separate from the user's own mute so presets never capture it.
+  fader.gain.value   = (params.mute || params.soloMute)
+    ? 0 : faderGain(params.fader) * faderGain(params.masterFader ?? 1.0);
   panner.pan.value   = params.pan;
 
   const e = v => v ? 1 : 0;
@@ -557,8 +560,13 @@ window.addEventListener('__ffac_el', () => {
 
 // Periodic safety net — catches anything missed by the above (e.g. elements
 // injected by scripts that bypass createElement, or late-loading iframes).
+// Light pass (media elements only) every 2s; the full shadow-root sweep walks
+// every element in the document, so it only runs every 10s.
+let _deepScanTick = 0;
 setInterval(() => {
-  if (ctx && chain) scanDeep(document);
+  if (!ctx || !chain) return;
+  if (++_deepScanTick % 5 === 0) scanDeep(document);
+  else document.querySelectorAll('audio, video').forEach(processEl);
 }, 2000);
 
 browser.runtime.onMessage.addListener((msg) => {

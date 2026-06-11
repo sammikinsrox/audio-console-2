@@ -142,7 +142,8 @@ browser.runtime.onMessage.addListener((msg, sender) => {
     if (sidebarPort) {
       sidebarPort.postMessage({
         type: 'ANALYSER_DATA', tabId,
-        fft: msg.fft, peak: msg.peak, rms: msg.rms, lufs: msg.lufs,
+        fft: msg.fft, peak: msg.peak, truePeak: msg.truePeak, rms: msg.rms, lufs: msg.lufs,
+        correlation: msg.correlation,
         hasAudio: msg.hasAudio, ctxState: msg.ctxState,
         gateGr: msg.gateGr, expanderGr: msg.expanderGr, compGr: msg.compGr, limiterGr: msg.limiterGr
       });

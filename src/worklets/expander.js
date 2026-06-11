@@ -22,26 +22,37 @@ class ExpanderProcessor extends AudioWorkletProcessor {
     if (!inp?.length) return true;
 
     const enabled   = parameters.enabled[0];
+
+    if (!enabled) {
+      for (let ch = 0; ch < out.length; ch++) out[ch].set(inp[ch] ?? inp[0]);
+      return true;
+    }
+
     const threshold = parameters.threshold[0];
     const ratio     = parameters.ratio[0];
     const atkCoef   = Math.exp(-1 / (sampleRate * parameters.attack[0]));
     const relCoef   = Math.exp(-1 / (sampleRate * parameters.release[0]));
+    const blockSize = inp[0].length;
 
-    for (let ch = 0; ch < out.length; ch++) {
-      const ic = inp[ch] ?? inp[0];
-      const oc = out[ch];
-      for (let i = 0; i < oc.length; i++) {
-        if (!enabled) { oc[i] = ic[i]; continue; }
-        const abs = Math.abs(ic[i]);
-        const levelDb = abs > 0 ? 20 * Math.log10(abs) : -120;
-        const coef = levelDb > this.envelope ? atkCoef : relCoef;
-        this.envelope = this.envelope * coef + levelDb * (1 - coef);
-        let gainDb = 0;
-        if (this.envelope < threshold) {
-          gainDb = (threshold - this.envelope) * (1 / ratio - 1);
-        }
-        this._lastGainDb = gainDb;
-        oc[i] = ic[i] * Math.pow(10, gainDb / 20);
+    for (let i = 0; i < blockSize; i++) {
+      // Stereo-linked detection: one envelope/gain shared by all channels
+      let abs = 0;
+      for (let ch = 0; ch < inp.length; ch++) {
+        const a = Math.abs(inp[ch][i]);
+        if (a > abs) abs = a;
+      }
+      const levelDb = abs > 0 ? 20 * Math.log10(abs) : -120;
+      const coef = levelDb > this.envelope ? atkCoef : relCoef;
+      this.envelope = this.envelope * coef + levelDb * (1 - coef);
+      let gainDb = 0;
+      if (this.envelope < threshold) {
+        gainDb = (threshold - this.envelope) * (1 / ratio - 1);
+      }
+      this._lastGainDb = gainDb;
+      const lin = Math.pow(10, gainDb / 20);
+      for (let ch = 0; ch < out.length; ch++) {
+        const ic = inp[ch] ?? inp[0];
+        out[ch][i] = ic[i] * lin;
       }
     }
     if (++this._tick >= 20) {

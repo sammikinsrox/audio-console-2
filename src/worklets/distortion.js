@@ -9,6 +9,8 @@ class DistortionProcessor extends AudioWorkletProcessor {
   }
 
   overdrive(x, k) {
+    // amount acts as input drive into the 3-segment soft-clip curve (max 10x)
+    x *= 1 + Math.min(k, 9);
     const abs = Math.abs(x);
     const sign = x < 0 ? -1 : 1;
     if (abs < 1/3) return sign * 2 * abs;
