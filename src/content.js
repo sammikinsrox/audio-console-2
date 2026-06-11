@@ -152,7 +152,9 @@ async function init() {
   const corrSplitter  = ctx.createChannelSplitter(2);
   const corrAnalyserL = ctx.createAnalyser();
   const corrAnalyserR = ctx.createAnalyser();
-  corrAnalyserL.fftSize = corrAnalyserR.fftSize = 512;
+  // 2048 matches the main analyser window — these feed both the correlation
+  // meter and the per-side L/R peak meters.
+  corrAnalyserL.fftSize = corrAnalyserR.fftSize = 2048;
   corrAnalyserL.smoothingTimeConstant = corrAnalyserR.smoothingTimeConstant = 0;
 
   // Wire chain
@@ -216,8 +218,8 @@ async function init() {
 
   const fftData  = new Float32Array(analyser.frequencyBinCount);
   const timeData = new Float32Array(analyser.fftSize);
-  const corrBufL = new Float32Array(512);
-  const corrBufR = new Float32Array(512);
+  const corrBufL = new Float32Array(corrAnalyserL.fftSize);
+  const corrBufR = new Float32Array(corrAnalyserR.fftSize);
 
   // BS.1770 K-weighting filter coefficients (sample-rate dependent)
   const sr = ctx.sampleRate;
@@ -274,14 +276,19 @@ async function init() {
     kwMs /= timeData.length;
     const rms = Math.sqrt(rmsSum / timeData.length);
 
-    // Phase correlation
+    // Phase correlation + per-side L/R peaks (stereo metering)
     chain.corrAnalyserL.getFloatTimeDomainData(corrBufL);
     chain.corrAnalyserR.getFloatTimeDomainData(corrBufR);
-    let sumLR = 0, sumL2 = 0, sumR2 = 0;
+    let sumLR = 0, sumL2 = 0, sumR2 = 0, peakL = 0, peakR = 0;
     for (let i = 0; i < corrBufL.length; i++) {
-      sumLR += corrBufL[i] * corrBufR[i];
-      sumL2 += corrBufL[i] * corrBufL[i];
-      sumR2 += corrBufR[i] * corrBufR[i];
+      const l = corrBufL[i], r = corrBufR[i];
+      sumLR += l * r;
+      sumL2 += l * l;
+      sumR2 += r * r;
+      const al = l < 0 ? -l : l;
+      const ar = r < 0 ? -r : r;
+      if (al > peakL) peakL = al;
+      if (ar > peakR) peakR = ar;
     }
     const corrDenom = Math.sqrt(sumL2 * sumR2);
     const correlation = corrDenom > 1e-10 ? Math.max(-1, Math.min(1, sumLR / corrDenom)) : 1;
@@ -303,6 +310,7 @@ async function init() {
       browser.runtime.sendMessage({
         type: 'ANALYSER_DATA',
         fft: Array.from(fftData), peak, truePeak, rms, lufs,
+        peakL, peakR,
         hasAudio: true,
         ctxState: ctx.state,
         correlation,

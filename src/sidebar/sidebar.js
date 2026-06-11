@@ -902,7 +902,8 @@ class AudioConsole {
     this.masterMuted  = false;
     this.specCanvas   = null;
     this.raf          = null;
-    this.peakHolds     = new Map();   // tabId -> { level, frames }
+    this.peakHoldsL    = new Map();   // tabId -> { level, frames } (left)
+    this.peakHoldsR    = new Map();   // tabId -> { level, frames } (right)
     this.truePeakHolds = new Map();   // tabId -> { level, frames }
     this._paramMenuState = null;       // { onCommit }
     this.eqTabId  = null;
@@ -1006,10 +1007,31 @@ class AudioConsole {
     this._initEditor();
     this._initEqEditor();
     this._initTheme();
+    this._initAbout();
     this._initZoom();
     this._initParamMenu();
     this._loadThemePrefs();
     this._startRaf();
+  }
+
+  _initAbout() {
+    const logo  = document.getElementById('logo');
+    const panel = document.getElementById('about-panel');
+    if (!logo || !panel) return;
+    try {
+      document.getElementById('about-version').textContent =
+        'v' + browser.runtime.getManifest().version;
+    } catch (_) {}
+    logo.addEventListener('click', () => panel.classList.toggle('hidden'));
+    logo.title = 'About Audio Console';
+    document.getElementById('btn-about-close').addEventListener('click', () => {
+      panel.classList.add('hidden');
+    });
+    // Close on outside click (same pattern as the theme panel)
+    document.addEventListener('click', e => {
+      if (!panel.contains(e.target) && e.target !== logo)
+        panel.classList.add('hidden');
+    }, true);
   }
 
   _setupMasterStrip() {
@@ -1070,17 +1092,20 @@ class AudioConsole {
     if (msg.type === 'TAB_LIST')     this._reconcileTabs(msg.tabs, msg.groups || {});
     if (msg.type === 'PARAMS_RESPONSE') this._restoreChannelParams(msg.tabId, msg.params);
     if (msg.type === 'ANALYSER_DATA') {
+      const peakL = msg.peakL ?? msg.peak;
+      const peakR = msg.peakR ?? msg.peak;
       this.analyserData.set(msg.tabId, { fft: msg.fft, peak: msg.peak, rms: msg.rms, lufs: msg.lufs ?? null,
+        peakL, peakR,
         truePeak: msg.truePeak ?? msg.peak, correlation: msg.correlation ?? 1,
         ctxState: msg.ctxState, gateGr: msg.gateGr ?? 1, expanderGr: msg.expanderGr ?? 0, compGr: msg.compGr ?? 0,
         limiterGr: msg.limiterGr ?? 0 });
-      this._updatePeakHold(msg.tabId, msg.peak);
+      this._updatePeakHolds(msg.tabId, peakL, peakR);
       this._updateTruePeakHold(msg.tabId, msg.truePeak ?? msg.peak);
       this._dirtyData.add(msg.tabId);
       this._masterDirty = true;
       // Clip LED — latch here (not in the draw) so clips on collapsed strips
       // still register; cleared only by user click.
-      if (msg.peak >= 1.0) {
+      if (Math.max(msg.peak, peakL, peakR) >= 1.0) {
         this.clippedChannels.add(msg.tabId);
         this.channels.get(msg.tabId)?.el.querySelector('.clip-led')?.classList.add('clipped');
       }
@@ -1166,7 +1191,9 @@ class AudioConsole {
         ch.el.remove();
         this.channels.delete(tabId);
         this.analyserData.delete(tabId);
-        this.peakHolds.delete(tabId);
+        this.peakHoldsL.delete(tabId);
+        this.peakHoldsR.delete(tabId);
+        this.truePeakHolds.delete(tabId);
         this.soloedTabs.delete(tabId);
         this.paramsFetched.delete(tabId);
         this.channelOrder = this.channelOrder.filter(id => id !== tabId);
@@ -2402,18 +2429,20 @@ class AudioConsole {
 
   // ── METERING / ANIMATION ──────────────────────────────────────────────────
 
-  _updatePeakHold(tabId, peak) {
-    const cur = this.peakHolds.get(tabId) || { level: 0, frames: 0 };
-    if (peak >= cur.level) { cur.level = peak; cur.frames = 80; }
-    else { cur.frames--; if (cur.frames <= 0) cur.level *= 0.94; }
-    this.peakHolds.set(tabId, cur);
+  _updateHold(map, key, level, frames, decay) {
+    const cur = map.get(key) || { level: 0, frames: 0 };
+    if (level >= cur.level) { cur.level = level; cur.frames = frames; }
+    else { cur.frames--; if (cur.frames <= 0) cur.level *= decay; }
+    map.set(key, cur);
   }
 
-  _updateTruePeakHold(tabId, tp) {
-    const cur = this.truePeakHolds.get(tabId) || { level: 0, frames: 0 };
-    if (tp >= cur.level) { cur.level = tp; cur.frames = 180; }
-    else { cur.frames--; if (cur.frames <= 0) cur.level *= 0.97; }
-    this.truePeakHolds.set(tabId, cur);
+  _updatePeakHolds(key, peakL, peakR) {
+    this._updateHold(this.peakHoldsL, key, peakL, 80, 0.94);
+    this._updateHold(this.peakHoldsR, key, peakR, 80, 0.94);
+  }
+
+  _updateTruePeakHold(key, tp) {
+    this._updateHold(this.truePeakHolds, key, tp, 180, 0.97);
   }
 
   _isLightTheme() { return this._currentThemeKey === 'solar'; }
@@ -2535,170 +2564,120 @@ class AudioConsole {
     g.strokeRect(0.5, 0.5, W - 1, H - 1);
   }
 
-  _drawMeters() {
-    const BAR_W = 10; // left portion: level bar
+  // Stereo L/R meter renderer shared by channel strips and the master strip.
+  // Bar zone is BAR_W px wide: L bar x1-4, 1px gap, R bar x6-9. Each side has
+  // its own peak hold line; the numeric readout shows the higher of the two.
+  _renderMeter(g, W, H, holdKey, peakL, peakR) {
+    const BAR_W = 10;
     const DB_SCALE = [[0, '0'], [-6, '-6'], [-12, '-12'], [-20, '-20'], [-40, '-40']];
+    const light = this._isLightTheme();
+    const dbToY = p => {
+      const db = p > 0 ? 20 * Math.log10(p) : -80;
+      return H - Math.max(0, Math.min(H, ((db + 60) / 66) * H));
+    };
 
+    g.fillStyle = light ? '#ddd7cf' : '#08080d';
+    g.fillRect(0, 0, W, H);
+
+    // Level bars
+    const yL = dbToY(peakL), yR = dbToY(peakR);
+    if (yL < H || yR < H) {
+      const grad = g.createLinearGradient(0, H, 0, 0);
+      grad.addColorStop(0,     '#1fb86a');  // green  (−60 dB)
+      grad.addColorStop(0.636, '#1fb86a');  // green  (−18 dB)
+      grad.addColorStop(0.773, '#f5c542');  // yellow ( −9 dB)
+      grad.addColorStop(0.864, '#ff8c00');  // orange ( −3 dB)
+      grad.addColorStop(0.909, '#ff3355');  // red    (  0 dB)
+      grad.addColorStop(1.0,   '#ff3355');  // red    ( +6 dB)
+      g.fillStyle = grad;
+      if (yL < H) g.fillRect(1, yL, 4, H - yL);
+      if (yR < H) g.fillRect(6, yR, 4, H - yR);
+    }
+
+    // Independent L/R peak hold lines; track the higher one for the readout
+    let labelDb = null, labelHoldY = null;
+    const drawHold = (map, x) => {
+      const hold = map.get(holdKey);
+      if (!(hold?.level > 0)) return;
+      const holdDb = 20 * Math.log10(hold.level);
+      const y = dbToY(hold.level);
+      g.fillStyle = holdDb >= 0 ? '#ff3355' : '#c8c8e8';
+      g.fillRect(x, y, 4, 1);
+      if (labelDb === null || holdDb > labelDb) { labelDb = holdDb; labelHoldY = y; }
+    };
+    drawHold(this.peakHoldsL, 1);
+    drawHold(this.peakHoldsR, 6);
+
+    if (labelDb !== null) {
+      const holdInt  = Math.round(labelDb);
+      const holdText = holdInt >= 0 ? `+${holdInt}` : `${holdInt}`;
+      g.font = 'bold 9px "JetBrains Mono", monospace';
+      g.fillStyle = labelDb >= 0 ? '#ff3355' : '#c8c8e8';
+      g.textAlign = 'left';
+      g.fillText(holdText, BAR_W + 2, Math.max(labelHoldY + 7, 10));
+    }
+
+    // True-peak hold — faint full-width line tracking inter-sample peaks
+    const tpHold = this.truePeakHolds.get(holdKey);
+    if (tpHold?.level > 0) {
+      const tpDb = 20 * Math.log10(tpHold.level);
+      g.fillStyle = tpDb >= 0 ? 'rgba(255,51,85,0.7)' : 'rgba(200,200,232,0.45)';
+      g.fillRect(1, dbToY(tpHold.level), BAR_W - 1, 1);
+    }
+
+    // Segment dividers on bar zone only
+    g.fillStyle = light ? '#ddd7cf' : '#08080d';
+    for (let i = 1; i < 12; i++) g.fillRect(0, Math.round(H * i / 12), BAR_W, 1);
+
+    // Static dB scale labels (right zone) — skip any that would overlap hold readout
+    g.font = '9px "JetBrains Mono", monospace';
+    g.textAlign = 'left';
+    for (const [db, text] of DB_SCALE) {
+      const y = H - ((db + 60) / 66) * H;
+      if (labelHoldY !== null && Math.abs(y - labelHoldY) < 12) continue;
+      g.fillStyle = light ? '#b0a898' : '#252545';
+      g.fillRect(BAR_W, y, 3, 1);
+      g.fillStyle = light ? (db >= -6 ? '#5a5248' : '#8e8880') : (db >= -6 ? '#585880' : '#333352');
+      g.fillText(text, BAR_W + 4, y + 4);
+    }
+  }
+
+  _drawMeters() {
     for (const [tabId, ch] of this.channels) {
       if (!this._dirtyData.has(tabId)) continue;
       if (ch.el.classList.contains('collapsed')) continue; // canvas hidden
       const canvas = ch.el.querySelector('.meter-canvas');
       if (!canvas) continue;
       const g = canvas.getContext('2d');
-      const W = canvas.width, H = canvas.height;
-      const light = this._isLightTheme();
-
-      g.fillStyle = light ? '#ddd7cf' : '#08080d';
-      g.fillRect(0, 0, W, H);
-
       const data = this.analyserData.get(tabId);
-      const peak = data?.peak ?? 0;
-      const hold = this.peakHolds.get(tabId);
-
-      const peakDb = peak > 0 ? 20 * Math.log10(peak) : -80;
-      const fillH  = Math.max(0, Math.min(H, ((peakDb + 60) / 66) * H));
-
-      // Level bar (left zone)
-      if (fillH > 0) {
-        const grad = g.createLinearGradient(0, H, 0, 0);
-        grad.addColorStop(0,     '#1fb86a');  // green  (−60 dB)
-        grad.addColorStop(0.636, '#1fb86a');  // green  (−18 dB)
-        grad.addColorStop(0.773, '#f5c542');  // yellow ( −9 dB)
-        grad.addColorStop(0.864, '#ff8c00');  // orange ( −3 dB)
-        grad.addColorStop(0.909, '#ff3355');  // red    (  0 dB)
-        grad.addColorStop(1.0,   '#ff3355');  // red    ( +6 dB)
-        g.fillStyle = grad;
-        g.fillRect(1, H - fillH, BAR_W - 1, fillH);
-      }
-
-      // Peak hold line + numeric label
-      let holdY = null;
-      if (hold?.level > 0) {
-        const holdDb = 20 * Math.log10(hold.level);
-        holdY = H - Math.max(0, Math.min(H, ((holdDb + 60) / 66) * H));
-        const holdColor = holdDb >= 0 ? '#ff3355' : '#c8c8e8';
-        g.fillStyle = holdColor;
-        g.fillRect(1, holdY, BAR_W - 1, 1);
-
-        // Dynamic dB value at hold position
-        const holdInt = Math.round(holdDb);
-        const holdText = holdInt >= 0 ? `+${holdInt}` : `${holdInt}`;
-        g.font = 'bold 9px "JetBrains Mono", monospace';
-        g.fillStyle = holdColor;
-        g.textAlign = 'left';
-        const labelY = Math.max(holdY + 7, 10);
-        g.fillText(holdText, BAR_W + 2, labelY);
-      }
-
-      // True-peak hold — thinner line tracking inter-sample peaks
-      const tpHold = this.truePeakHolds.get(tabId);
-      if (tpHold?.level > 0) {
-        const tpDb = 20 * Math.log10(tpHold.level);
-        const tpY = H - Math.max(0, Math.min(H, ((tpDb + 60) / 66) * H));
-        g.fillStyle = tpDb >= 0 ? 'rgba(255,51,85,0.7)' : 'rgba(200,200,232,0.45)';
-        g.fillRect(1, tpY, Math.max(1, Math.floor(BAR_W / 2)), 1);
-      }
-
-      // Segment dividers on bar only
-      g.fillStyle = light ? '#ddd7cf' : '#08080d';
-      for (let i = 1; i < 12; i++) g.fillRect(0, Math.round(H * i / 12), BAR_W, 1);
-
-      // Static dB scale labels (right zone) — skip any that would overlap hold readout
-      g.font = '9px "JetBrains Mono", monospace';
-      g.textAlign = 'left';
-      for (const [db, text] of DB_SCALE) {
-        const y = H - ((db + 60) / 66) * H;
-        // Skip if too close to the hold value label
-        if (holdY !== null && Math.abs(y - holdY) < 12) continue;
-        // Tick mark bridging bar and scale
-        g.fillStyle = light ? '#b0a898' : '#252545';
-        g.fillRect(BAR_W, y, 3, 1);
-        g.fillStyle = light ? (db >= -6 ? '#5a5248' : '#8e8880') : (db >= -6 ? '#585880' : '#333352');
-        g.fillText(text, BAR_W + 4, y + 4);
-      }
-
+      const peakL = data?.peakL ?? data?.peak ?? 0;
+      const peakR = data?.peakR ?? data?.peak ?? 0;
+      this._renderMeter(g, canvas.width, canvas.height, tabId, peakL, peakR);
     }
 
-    // Master meter — max peak across all channels (master fader already baked in)
+    // Master meter — per-side max across all channels (master fader already baked in)
     const masterEl = document.getElementById('master-strip');
     const masterCanvas = masterEl?.querySelector('.meter-canvas');
     if (masterCanvas && this._masterDirty) {
-      const g = masterCanvas.getContext('2d');
-      const W = masterCanvas.width, H = masterCanvas.height;
-
-      let masterPeak = 0, masterTruePeak = 0;
+      let masterPeakL = 0, masterPeakR = 0, masterTruePeak = 0;
       if (!this.masterMuted) {
         for (const data of this.analyserData.values()) {
-          if ((data.peak ?? 0) > masterPeak) masterPeak = data.peak;
+          const pl = data.peakL ?? data.peak ?? 0;
+          const pr = data.peakR ?? data.peak ?? 0;
+          if (pl > masterPeakL) masterPeakL = pl;
+          if (pr > masterPeakR) masterPeakR = pr;
           const tp = data.truePeak ?? data.peak ?? 0;
           if (tp > masterTruePeak) masterTruePeak = tp;
         }
       }
 
-      this._updatePeakHold('master', masterPeak);
+      this._updatePeakHolds('master', masterPeakL, masterPeakR);
       this._updateTruePeakHold('master', masterTruePeak);
 
-      const light = this._isLightTheme();
-      g.fillStyle = light ? '#ddd7cf' : '#08080d';
-      g.fillRect(0, 0, W, H);
+      const g = masterCanvas.getContext('2d');
+      this._renderMeter(g, masterCanvas.width, masterCanvas.height, 'master', masterPeakL, masterPeakR);
 
-      const peakDb = masterPeak > 0 ? 20 * Math.log10(masterPeak) : -80;
-      const fillH  = Math.max(0, Math.min(H, ((peakDb + 60) / 66) * H));
-
-      if (fillH > 0) {
-        const grad = g.createLinearGradient(0, H, 0, 0);
-        grad.addColorStop(0,     '#1fb86a');  // green  (−60 dB)
-        grad.addColorStop(0.636, '#1fb86a');  // green  (−18 dB)
-        grad.addColorStop(0.773, '#f5c542');  // yellow ( −9 dB)
-        grad.addColorStop(0.864, '#ff8c00');  // orange ( −3 dB)
-        grad.addColorStop(0.909, '#ff3355');  // red    (  0 dB)
-        grad.addColorStop(1.0,   '#ff3355');  // red    ( +6 dB)
-        g.fillStyle = grad;
-        g.fillRect(1, H - fillH, BAR_W - 1, fillH);
-      }
-
-      let holdY = null;
-      const hold = this.peakHolds.get('master');
-      if (hold?.level > 0) {
-        const holdDb = 20 * Math.log10(hold.level);
-        holdY = H - Math.max(0, Math.min(H, ((holdDb + 60) / 66) * H));
-        const holdColor = holdDb >= 0 ? '#ff3355' : '#c8c8e8';
-        g.fillStyle = holdColor;
-        g.fillRect(1, holdY, BAR_W - 1, 1);
-
-        const holdInt = Math.round(holdDb);
-        const holdText = holdInt >= 0 ? `+${holdInt}` : `${holdInt}`;
-        g.font = 'bold 9px "JetBrains Mono", monospace';
-        g.fillStyle = holdColor;
-        g.textAlign = 'left';
-        const labelY = Math.max(holdY + 7, 10);
-        g.fillText(holdText, BAR_W + 2, labelY);
-      }
-
-      // True-peak hold — thinner line tracking inter-sample peaks
-      const tpHold = this.truePeakHolds.get('master');
-      if (tpHold?.level > 0) {
-        const tpDb = 20 * Math.log10(tpHold.level);
-        const tpY = H - Math.max(0, Math.min(H, ((tpDb + 60) / 66) * H));
-        g.fillStyle = tpDb >= 0 ? 'rgba(255,51,85,0.7)' : 'rgba(200,200,232,0.45)';
-        g.fillRect(1, tpY, Math.max(1, Math.floor(BAR_W / 2)), 1);
-      }
-
-      g.fillStyle = light ? '#ddd7cf' : '#08080d';
-      for (let i = 1; i < 12; i++) g.fillRect(0, Math.round(H * i / 12), BAR_W, 1);
-
-      g.font = '9px "JetBrains Mono", monospace';
-      g.textAlign = 'left';
-      for (const [db, text] of DB_SCALE) {
-        const y = H - ((db + 60) / 66) * H;
-        if (holdY !== null && Math.abs(y - holdY) < 12) continue;
-        g.fillStyle = light ? '#b0a898' : '#252545';
-        g.fillRect(BAR_W, y, 3, 1);
-        g.fillStyle = light ? (db >= -6 ? '#5a5248' : '#8e8880') : (db >= -6 ? '#585880' : '#333352');
-        g.fillText(text, BAR_W + 4, y + 4);
-      }
-
-      if (masterPeak >= 1.0) {
+      if (Math.max(masterPeakL, masterPeakR) >= 1.0) {
         this.masterClipped = true;
         const led = masterEl.querySelector('.clip-led');
         if (led) led.classList.add('clipped');
