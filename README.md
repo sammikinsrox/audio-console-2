@@ -2,17 +2,6 @@
 
 <img width="400" height="916" alt="Screenshot 2026-06-11 200948" src="https://github.com/user-attachments/assets/87e565a0-45d6-4366-9f02-1d5913e00e1d" />
 
-
-
-
-
-
-
-
-
-<img width="244" height="221" alt="Screenshot 2026-06-11 195924" src="https://github.com/user-attachments/assets/2367d2fe-3ccc-4459-acb0-7485a2ea4225" />
-
-
 [Demo video](https://github.com/user-attachments/assets/4468116b-33ce-4454-bc2f-a348302d494e)
 
 A professional per-tab audio mixing console for Firefox, Chrome, and Edge. Opens as a sidebar and provides a full channel strip for every tab playing audio, with a complete effects chain, parametric EQ, real-time metering, and spectrum analysis.
