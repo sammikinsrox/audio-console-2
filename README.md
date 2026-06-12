@@ -1,5 +1,24 @@
 <img width="1200" height="250" alt="logolarge" src="https://github.com/user-attachments/assets/1f97c06c-a32c-492a-8b5d-d5081d812ff0" />
 
+<img width="400" height="916" alt="Screenshot 2026-06-11 200948" src="https://github.com/user-attachments/assets/87e565a0-45d6-4366-9f02-1d5913e00e1d" />
+<img width="246" height="208" alt="Screenshot 2026-06-11 200610" src="https://github.com/user-attachments/assets/2e129720-3f45-4c85-a81f-66c09392576c" />
+<img width="245" height="196" alt="Screenshot 2026-06-11 200559" src="https://github.com/user-attachments/assets/3d071628-eba9-464a-98d5-4dffcf35e881" />
+<img width="242" height="171" alt="Screenshot 2026-06-11 200550" src="https://github.com/user-attachments/assets/155d045a-c145-47d6-8379-1291bce3816c" />
+<img width="243" height="208" alt="Screenshot 2026-06-11 200540" src="https://github.com/user-attachments/assets/466d510a-850f-4dc7-be48-895c08f8f9d4" />
+<img width="243" height="209" alt="Screenshot 2026-06-11 200529" src="https://github.com/user-attachments/assets/92468fef-e662-452c-9ba6-41fadeb57e8e" />
+<img width="245" height="191" alt="Screenshot 2026-06-11 200516" src="https://github.com/user-attachments/assets/08ea694b-f659-4e4a-ac4f-8f4c2a6855a4" />
+<img width="244" height="191" alt="Screenshot 2026-06-11 200503" src="https://github.com/user-attachments/assets/b3ce1ab3-7338-4f82-9035-1d95389a789f" />
+<img width="243" height="219" alt="Screenshot 2026-06-11 200452" src="https://github.com/user-attachments/assets/161cc3b0-c9c8-4bd6-ac5a-6c9d335a1881" />
+<img width="483" height="326" alt="Screenshot 2026-06-11 200435" src="https://github.com/user-attachments/assets/950a2264-b447-428b-bc3b-bd40a5051330" />
+<img width="244" height="204" alt="Screenshot 2026-06-11 200404" src="https://github.com/user-attachments/assets/51750905-d67e-4cf7-b68e-b2a02d79dc82" />
+<img width="243" height="197" alt="Screenshot 2026-06-11 200023" src="https://github.com/user-attachments/assets/4e053e0e-4ee2-48a9-8311-a94416f0f1d7" />
+<img width="247" height="260" alt="Screenshot 2026-06-11 200000" src="https://github.com/user-attachments/assets/01a6a8f8-f069-493f-9957-f013becb9919" />
+<img width="244" height="223" alt="Screenshot 2026-06-11 195949" src="https://github.com/user-attachments/assets/91a910cc-c4ea-4404-8bd1-774cbbb24ef5" />
+<img width="244" height="221" alt="Screenshot 2026-06-11 195924" src="https://github.com/user-attachments/assets/2367d2fe-3ccc-4459-acb0-7485a2ea4225" />
+
+
+[Demo video](https://github.com/user-attachments/assets/4468116b-33ce-4454-bc2f-a348302d494e)
+
 A professional per-tab audio mixing console for Firefox, Chrome, and Edge. Opens as a sidebar and provides a full channel strip for every tab playing audio, with a complete effects chain, parametric EQ, real-time metering, and spectrum analysis.
 
 ## Features
@@ -202,14 +221,6 @@ The background script manages the list of active tabs with audio, routes message
 Vanilla JavaScript with a lightweight build step (`node build.mjs`) and no runtime dependencies. CSS custom properties for theming. Web Audio API with AudioWorklet for sample-accurate DSP. WebExtension APIs via `webextension-polyfill` (`browser.*` namespace unified across Firefox and Chrome). Fonts loaded from Google Fonts (Bebas Neue, Barlow Condensed, JetBrains Mono).
 
 The Firefox build uses Manifest V2 with a sidebar action and background scripts. The Chrome/Edge build uses Manifest V3 with a service worker, the Side Panel API, and a `world: "MAIN"` content script to patch `createElement` before page scripts run — bypassing strict Content Security Policies on sites like YouTube without requiring `unsafe-inline`.
-
----
-
-## Screenshots
-
-<img width="575" height="915" alt="Audio Console Screenshot" src="https://github.com/user-attachments/assets/905e5d2d-5cef-44d7-a19f-ea9e6f5211b2" />
-
-[Demo video](https://github.com/user-attachments/assets/4468116b-33ce-4454-bc2f-a348302d494e)
 
 ---
 
