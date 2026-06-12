@@ -1,19 +1,15 @@
 <img width="1200" height="250" alt="logolarge" src="https://github.com/user-attachments/assets/1f97c06c-a32c-492a-8b5d-d5081d812ff0" />
 
 <img width="400" height="916" alt="Screenshot 2026-06-11 200948" src="https://github.com/user-attachments/assets/87e565a0-45d6-4366-9f02-1d5913e00e1d" />
-<img width="246" height="208" alt="Screenshot 2026-06-11 200610" src="https://github.com/user-attachments/assets/2e129720-3f45-4c85-a81f-66c09392576c" />
-<img width="245" height="196" alt="Screenshot 2026-06-11 200559" src="https://github.com/user-attachments/assets/3d071628-eba9-464a-98d5-4dffcf35e881" />
-<img width="242" height="171" alt="Screenshot 2026-06-11 200550" src="https://github.com/user-attachments/assets/155d045a-c145-47d6-8379-1291bce3816c" />
-<img width="243" height="208" alt="Screenshot 2026-06-11 200540" src="https://github.com/user-attachments/assets/466d510a-850f-4dc7-be48-895c08f8f9d4" />
-<img width="243" height="209" alt="Screenshot 2026-06-11 200529" src="https://github.com/user-attachments/assets/92468fef-e662-452c-9ba6-41fadeb57e8e" />
-<img width="245" height="191" alt="Screenshot 2026-06-11 200516" src="https://github.com/user-attachments/assets/08ea694b-f659-4e4a-ac4f-8f4c2a6855a4" />
-<img width="244" height="191" alt="Screenshot 2026-06-11 200503" src="https://github.com/user-attachments/assets/b3ce1ab3-7338-4f82-9035-1d95389a789f" />
-<img width="243" height="219" alt="Screenshot 2026-06-11 200452" src="https://github.com/user-attachments/assets/161cc3b0-c9c8-4bd6-ac5a-6c9d335a1881" />
-<img width="483" height="326" alt="Screenshot 2026-06-11 200435" src="https://github.com/user-attachments/assets/950a2264-b447-428b-bc3b-bd40a5051330" />
-<img width="244" height="204" alt="Screenshot 2026-06-11 200404" src="https://github.com/user-attachments/assets/51750905-d67e-4cf7-b68e-b2a02d79dc82" />
-<img width="243" height="197" alt="Screenshot 2026-06-11 200023" src="https://github.com/user-attachments/assets/4e053e0e-4ee2-48a9-8311-a94416f0f1d7" />
-<img width="247" height="260" alt="Screenshot 2026-06-11 200000" src="https://github.com/user-attachments/assets/01a6a8f8-f069-493f-9957-f013becb9919" />
-<img width="244" height="223" alt="Screenshot 2026-06-11 195949" src="https://github.com/user-attachments/assets/91a910cc-c4ea-4404-8bd1-774cbbb24ef5" />
+
+
+
+
+
+
+
+
+
 <img width="244" height="221" alt="Screenshot 2026-06-11 195924" src="https://github.com/user-attachments/assets/2367d2fe-3ccc-4459-acb0-7485a2ea4225" />
 
 
@@ -75,53 +71,79 @@ Every channel has a fixed-order effects chain with thirteen independent processo
 
 **Gate**
 
+<img width="244" height="223" alt="Screenshot 2026-06-11 195949" src="https://github.com/user-attachments/assets/91a910cc-c4ea-4404-8bd1-774cbbb24ef5" />
+
 The gate silences the channel whenever the input level falls below a set threshold. This is useful for eliminating noise, room tone, or low-level hum that is audible during quiet passages. Parameters: threshold (-80 to 0 dB), attack time (0.1 to 500 ms), hold time (0 to 1000 ms), and release time (1 to 2000 ms). The attack and release times shape how quickly the gate opens and closes. Hold keeps the gate open for a fixed duration after the signal drops below threshold, preventing rapid chattering on borderline signals. The visualization shows the current signal level relative to the threshold and indicates whether the gate is currently open or closed. Presets: Subtle, Moderate, Tight, Hard Gate.
 
 **Expander**
+
+<img width="247" height="260" alt="Screenshot 2026-06-11 200000" src="https://github.com/user-attachments/assets/01a6a8f8-f069-493f-9957-f013becb9919" />
 
 The expander attenuates signals below a threshold by a configurable ratio, increasing the apparent quietness of low-level material without fully gating it. It is a gentler alternative to the gate, useful for reducing background noise while preserving natural room ambience and breath sounds. Parameters: threshold (-80 to 0 dB), ratio (1:1 to 20:1), attack (0.1 to 500 ms), and release (1 to 2000 ms). The transfer curve visualization shows the input-to-output relationship with the threshold and ratio clearly marked, and a live dot tracks the current operating point. Presets: Gentle (1.5:1), Moderate (2:1), Strong (4:1).
 
 **Compressor**
 
+<img width="243" height="197" alt="Screenshot 2026-06-11 200023" src="https://github.com/user-attachments/assets/4e053e0e-4ee2-48a9-8311-a94416f0f1d7" />
+
 The compressor reduces dynamic range by attenuating signals that exceed the threshold. It uses the browser's native DynamicsCompressorNode for efficiency. Parameters: threshold (-60 to 0 dB), knee width (0 to 40 dB), ratio (1:1 to 20:1), attack (0.1 to 500 ms), release (10 to 3000 ms), and makeup gain (0 to +20 dB). The knee parameter softens the transition into compression, making it less audible on transients. Makeup gain compensates for the overall level reduction caused by compression. A gain reduction meter shows how much attenuation is currently being applied. The transfer curve visualization renders the full input/output relationship with the knee and threshold visible. Presets: Gentle (2:1), Moderate (4:1), Heavy (8:1), Limiter (20:1), Vocal (3:1), Drum Bus (6:1).
 
 **Tape saturation**
+
+<img width="244" height="204" alt="Screenshot 2026-06-11 200404" src="https://github.com/user-attachments/assets/51750905-d67e-4cf7-b68e-b2a02d79dc82" />
 
 Tape saturation emulates the nonlinear frequency response and soft clipping behavior of analog magnetic tape. It adds harmonic warmth and gentle compression-like density to the signal. Parameters: drive (1 to 10, controlling how hard the signal is pushed into the saturator), warmth (0 to 100%, blending a low-pass-filtered version of the saturated signal to emphasize the low-frequency coloration of tape), and mix (0 to 100%, wet/dry balance). The saturation function is a normalized hyperbolic tangent curve, which is the classic soft-clipping shape. Presets: Subtle, Warm, Hot, Saturate.
 
 **Distortion**
 
+<img width="483" height="326" alt="Screenshot 2026-06-11 200435" src="https://github.com/user-attachments/assets/950a2264-b447-428b-bc3b-bd40a5051330" />
+
 Distortion applies more aggressive clipping and waveshaping than the tape saturator. It is intended for intentional musical distortion effects. Parameters: amount (0 to 400, controlling the clipping intensity), mode (Overdrive for soft knee clipping, or Distortion for hard digital clipping), and mix (0 to 100%). The visualization shows the transfer curve for the selected mode. Presets: Light OD, Heavy OD, Crunch, Fuzz.
 
 **Delay**
+
+<img width="243" height="219" alt="Screenshot 2026-06-11 200452" src="https://github.com/user-attachments/assets/161cc3b0-c9c8-4bd6-ac5a-6c9d335a1881" />
 
 The delay creates time-based echo effects by playing back the signal after a configurable time offset. Parameters: delay time (0 to 2000 ms), feedback (0 to 95%, the proportion of the delayed signal fed back into the delay input to create multiple repeats), and mix (0 to 100%). The delay time can also be set via BPM sync mode, where you enter a tempo in beats per minute and select a rhythmic subdivision. Available subdivisions are 1/16, 1/8, dotted 1/8, 1/4, dotted 1/4, 1/2, and 1/1. Presets: Slapback (80 ms), Short Echo (200 ms), Medium Echo (375 ms), Long Echo (750 ms), Ambient (1000 ms).
 
 **Reverb**
 
+<img width="244" height="191" alt="Screenshot 2026-06-11 200503" src="https://github.com/user-attachments/assets/b3ce1ab3-7338-4f82-9035-1d95389a789f" />
+
 Reverb simulates the acoustic reflections of a physical space using convolution with a synthetically generated impulse response. The impulse response is a shaped noise burst whose length and decay envelope are controlled by the parameters: size (0.1 to 10 seconds, controlling the total IR length) and decay (0 to 100%, shaping the rate at which the tail fades). Mix controls the wet/dry balance (0 to 100%). Changing the size or decay parameters regenerates the impulse response in real time. Presets: Room (0.5 s), Small Hall (1.5 s), Hall (3 s), Plate (2 s), Chamber (1.2 s), Cathedral (8 s).
 
 **Chorus**
+
+<img width="245" height="191" alt="Screenshot 2026-06-11 200516" src="https://github.com/user-attachments/assets/08ea694b-f659-4e4a-ac4f-8f4c2a6855a4" />
 
 Chorus creates the illusion of multiple instruments or voices by mixing the dry signal with a copy that is slightly delayed and continuously pitch-modulated via a low-frequency oscillator. Parameters: rate (0.1 to 10 Hz, the speed of the LFO), depth (0 to 20 ms, the amount of delay time modulation, which determines the pitch deviation), and mix (0 to 100%). The visualization shows the LFO waveform and the resulting modulation envelope. Presets: Subtle (0.8 Hz, 1.5 ms), Classic (1.5 Hz, 3 ms), Lush (2.5 Hz, 5 ms), Thick (0.5 Hz, 8 ms).
 
 **Flanger**
 
+<img width="243" height="209" alt="Screenshot 2026-06-11 200529" src="https://github.com/user-attachments/assets/92468fef-e662-452c-9ba6-41fadeb57e8e" />
+
 Flanging is similar to chorus but uses a shorter delay range and adds a feedback path, creating a resonant comb-filter effect with a distinctive sweeping, jet-like character. Parameters: rate (0.01 to 5 Hz), depth (0 to 10 ms), feedback (-99 to +99%, with negative values inverting the phase of the feedback signal), and mix (0 to 100%). Presets: Gentle, Classic, Jet, Extreme.
 
 **Phaser**
+
+<img width="243" height="208" alt="Screenshot 2026-06-11 200540" src="https://github.com/user-attachments/assets/466d510a-850f-4dc7-be48-895c08f8f9d4" />
 
 The phaser uses a series of all-pass filters whose center frequency is swept by an LFO. This creates peaks and notches in the frequency response that move over time, producing a smooth, swirling modulation effect. Parameters: rate (0.01 to 10 Hz), depth (0 to 100%, controlling the frequency sweep range), feedback (0 to 99%), and mix (0 to 100%). Presets: Slow, Classic, Fast, Vintage.
 
 **Vibrato**
 
+<img width="242" height="171" alt="Screenshot 2026-06-11 200550" src="https://github.com/user-attachments/assets/155d045a-c145-47d6-8379-1291bce3816c" />
+
 Vibrato modulates the pitch of the signal by varying the delay time with no dry signal blending - the output is fully wet, creating pure pitch oscillation. Parameters: rate (0.1 to 20 Hz) and depth (0 to 20 ms, which determines the amount of pitch deviation). Presets: Subtle (3 Hz, 1 ms), Classic (5 Hz, 3 ms), Dramatic (8 Hz, 8 ms), Seasick (2 Hz, 15 ms).
 
 **Tremolo**
 
+<img width="245" height="196" alt="Screenshot 2026-06-11 200559" src="https://github.com/user-attachments/assets/3d071628-eba9-464a-98d5-4dffcf35e881" />
+
 Tremolo oscillates the amplitude of the signal at a set rate, creating a rhythmic pulsing or stuttering effect. Parameters: rate (0.1 to 20 Hz), depth (0 to 100%, the modulation amount), and shape (Sine for a smooth volume sweep, or Square for an abrupt on/off chop). Presets: Slow Sine (2 Hz, 60%), Fast Sine (8 Hz, 80%), Choppy Square (4 Hz, 90%), Stutter Square (12 Hz, 100%).
 
 **Limiter**
+
+<img width="246" height="208" alt="Screenshot 2026-06-11 200610" src="https://github.com/user-attachments/assets/2e129720-3f45-4c85-a81f-66c09392576c" />
 
 The limiter is a brick-wall processor that prevents the signal from exceeding a set ceiling under any circumstances. It is placed at the end of the chain, after all other effects, and is intended for final output protection. Parameters: ceiling (-20 to 0 dB, the absolute maximum output level), attack (0.01 to 5 ms), and release (10 to 2000 ms). The attack is kept extremely short by design so that the limiting is transparent and does not alter the character of transients. A gain reduction meter shows how much attenuation is being applied in real time. Presets: Transparent (-0.1 dB), Standard (-1 dB), Hard (-3 dB), Loud (-6 dB).
 
